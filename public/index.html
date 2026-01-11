@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Generate Rapor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen py-10">
+    <div class="container mx-auto px-4 max-w-2xl">
+        <div class="bg-white rounded-lg shadow-xl p-8">
+            <h1 class="text-3xl font-bold text-center text-blue-600 mb-2">Sistem Generate Rapor</h1>
+            <p class="text-center text-gray-500 mb-8">Upload data dan template untuk membuat rapor otomatis</p>
+
+            <form id="uploadForm" class="space-y-6">
+                <!-- Excel Input -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Upload Data Excel (.xlsx)</label>
+                    <div class="flex items-center justify-center w-full">
+                        <label for="excel_file" class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                <svg class="w-8 h-8 mb-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                                </svg>
+                                <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Klik untuk upload</span> Excel</p>
+                                <p class="text-xs text-gray-500" id="excel-name">XLSX only</p>
+                            </div>
+                            <input id="excel_file" name="excel_file" type="file" class="hidden" accept=".xlsx" required />
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Template Input (Optional) -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Upload Template Word (.docx) <span class="text-gray-400 font-normal">(Opsional)</span></label>
+                    <div class="flex items-center justify-center w-full">
+                        <label for="template_file" class="flex flex-col items-center justify-center w-full h-24 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Klik untuk ganti template default</span></p>
+                                <p class="text-xs text-gray-500" id="template-name">DOCX only</p>
+                            </div>
+                            <input id="template_file" name="template_file" type="file" class="hidden" accept=".docx" />
+                        </label>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">*Jika kosong, akan menggunakan template default server.</p>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" id="submitBtn" class="w-full text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-lg px-5 py-3 text-center transition-all">
+                    🚀 Generate Rapor
+                </button>
+            </form>
+
+            <!-- Loading & Result -->
+            <div id="statusArea" class="mt-6 hidden">
+                <div class="flex items-center justify-center p-4 mb-4 text-sm text-blue-800 rounded-lg bg-blue-50" role="alert">
+                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-blue-800" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span class="font-medium">Sedang memproses... Harap tunggu.</span>
+                </div>
+            </div>
+            
+            <div id="errorArea" class="mt-6 hidden">
+                 <div class="p-4 mb-4 text-sm text-red-800 rounded-lg bg-red-50" role="alert">
+                    <span class="font-medium">Error!</span> <span id="errorMsg"></span>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // Update file names on selection
+        document.getElementById('excel_file').addEventListener('change', function(e) {
+            if (e.target.files[0]) document.getElementById('excel-name').textContent = e.target.files[0].name;
+        });
+        document.getElementById('template_file').addEventListener('change', function(e) {
+            if (e.target.files[0]) document.getElementById('template-name').textContent = e.target.files[0].name;
+        });
+
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const statusArea = document.getElementById('statusArea');
+            const errorArea = document.getElementById('errorArea');
+            const errorMsg = document.getElementById('errorMsg');
+            
+            // Reset UI
+            statusArea.classList.remove('hidden');
+            errorArea.classList.add('hidden');
+            submitBtn.disabled = true;
+            submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            const formData = new FormData(this);
+
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'Terjadi kesalahan di server');
+                }
+
+                // Handle download
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = "rapor_generated.zip";
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+
+            } catch (error) {
+                errorMsg.textContent = error.message;
+                errorArea.classList.remove('hidden');
+            } finally {
+                statusArea.classList.add('hidden');
+                submitBtn.disabled = false;
+                submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        });
+    </script>
+</body>
+</html>
